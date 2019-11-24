@@ -12,7 +12,7 @@ from etc.toolbox import get_model_class_from_string
 from .settings import MODEL_FLAG
 from .utils import get_flag_model
 
-USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
+USER_MODEL = getattr(settings, "AUTH_USER_MODEL", "auth.User")
 
 
 @python_2_unicode_compatible
@@ -24,26 +24,34 @@ class FlagBase(models.Model):
     to customize model fields and behaviour.
 
     """
-    note = models.TextField(_('Note'), blank=True)
-    status = models.IntegerField(_('Status'), null=True, blank=True, db_index=True)
+
+    note = models.TextField(_("Note"), blank=True)
+    status = models.IntegerField(_("Status"), null=True, blank=True, db_index=True)
 
     user = models.ForeignKey(
-        USER_MODEL, related_name='%(class)s_users', verbose_name=_('User'), on_delete=models.CASCADE)
-    time_created = models.DateTimeField(_('Date created'), auto_now_add=True)
+        USER_MODEL,
+        related_name="%(class)s_users",
+        verbose_name=_("User"),
+        on_delete=models.CASCADE,
+    )
+    time_created = models.DateTimeField(_("Date created"), auto_now_add=True)
 
     # Here follows a link to an object.
-    object_id = models.PositiveIntegerField(verbose_name=_('Object ID'), db_index=True)
+    object_id = models.UUIDField(verbose_name=_("Object ID"), db_index=True)
     content_type = models.ForeignKey(
-        ContentType, verbose_name=_('Content type'), related_name='%(app_label)s_%(class)s_flags',
-        on_delete=models.CASCADE)
+        ContentType,
+        verbose_name=_("Content type"),
+        related_name="%(app_label)s_%(class)s_flags",
+        on_delete=models.CASCADE,
+    )
 
     linked_object = GenericForeignKey()
 
     class Meta(object):
         abstract = True
-        verbose_name = _('Flag')
-        verbose_name_plural = _('Flags')
-        unique_together = ('content_type', 'object_id', 'user', 'status')
+        verbose_name = _("Flag")
+        verbose_name_plural = _("Flags")
+        unique_together = ("content_type", "object_id", "user", "status")
 
     @classmethod
     def get_flags_for_types(cls, mdl_classes, user=None, status=None, allow_empty=True):
@@ -55,16 +63,18 @@ class FlagBase(models.Model):
         :param User user:
         :param int status:
         :param bool allow_empty: Flag. Include results for all given types, even those without associated flags.
-        :rtype: dict
+        :return:
         """
         if not mdl_classes or (user and not user.id):
             return {}
 
-        types_for_models = ContentType.objects.get_for_models(*mdl_classes, for_concrete_models=False)
-        filter_kwargs = {'content_type__in': types_for_models.values()}
+        types_for_models = ContentType.objects.get_for_models(
+            *mdl_classes, for_concrete_models=False
+        )
+        filter_kwargs = {"content_type__in": types_for_models.values()}
         update_filter_dict(filter_kwargs, user, status)
 
-        flags = cls.objects.filter(**filter_kwargs).order_by('-time_created')
+        flags = cls.objects.filter(**filter_kwargs).order_by("-time_created")
         flags_dict = defaultdict(list)
         for flag in flags:
             flags_dict[flag.content_type_id].append(flag)
@@ -87,7 +97,7 @@ class FlagBase(models.Model):
         :param list, QuerySet objects_list:
         :param User user:
         :param int status:
-        :rtype: dict
+        :return:
         """
         if not objects_list or (user and not user.id):
             return {}
@@ -97,9 +107,11 @@ class FlagBase(models.Model):
             objects_ids = [obj.pk for obj in objects_list]
 
         filter_kwargs = {
-            'object_id__in': objects_ids,
+            "object_id__in": objects_ids,
             # Consider this list homogeneous.
-            'content_type': ContentType.objects.get_for_model(objects_list[0], for_concrete_model=False)
+            "content_type": ContentType.objects.get_for_model(
+                objects_list[0], for_concrete_model=False
+            ),
         }
         update_filter_dict(filter_kwargs, user, status)
         flags = cls.objects.filter(**filter_kwargs)
@@ -116,7 +128,7 @@ class FlagBase(models.Model):
         return result
 
     def __str__(self):
-        return '%s:%s status %s' % (self.content_type, self.object_id, self.status)
+        return "%s:%s status %s" % (self.content_type, self.object_id, self.status)
 
 
 class Flag(FlagBase):
@@ -145,10 +157,11 @@ class ModelWithFlag(models.Model):
         :param User user:
         :param int status:
         :param bool allow_empty: Flag. Include results for all given types, even those without associated flags.
-        :rtype: dict
+        :return:
         """
         return get_model_class_from_string(MODEL_FLAG).get_flags_for_types(
-            mdl_classes, user=user, status=status, allow_empty=allow_empty)
+            mdl_classes, user=user, status=status, allow_empty=allow_empty
+        )
 
     @classmethod
     def get_flags_for_objects(cls, objects_list, user=None, status=None):
@@ -159,16 +172,18 @@ class ModelWithFlag(models.Model):
         :param list, QuerySet objects_list:
         :param User user:
         :param int status:
-        :rtype: dict
+        :return:
         """
-        return get_model_class_from_string(MODEL_FLAG).get_flags_for_objects(objects_list, user=user, status=status)
+        return get_model_class_from_string(MODEL_FLAG).get_flags_for_objects(
+            objects_list, user=user, status=status
+        )
 
     def get_flags(self, user=None, status=None):
         """Returns flags for the object optionally filtered by status.
 
         :param User user: Optional user filter
         :param int status: Optional status filter
-        :rtype: QuerySet
+        :return:
         """
         filter_kwargs = {}
         update_filter_dict(filter_kwargs, user, status)
@@ -185,14 +200,11 @@ class ModelWithFlag(models.Model):
         if not user.id:
             return None
 
-        init_kwargs = {
-            'user': user,
-            'linked_object': self,
-        }
+        init_kwargs = {"user": user, "linked_object": self}
         if note is not None:
-            init_kwargs['note'] = note
+            init_kwargs["note"] = note
         if status is not None:
-            init_kwargs['status'] = status
+            init_kwargs["status"] = status
 
         flag = get_flag_model()(**init_kwargs)
         try:
@@ -209,8 +221,8 @@ class ModelWithFlag(models.Model):
         :return:
         """
         filter_kwargs = {
-            'content_type': ContentType.objects.get_for_model(self),
-            'object_id': self.id
+            "content_type": ContentType.objects.get_for_model(self),
+            "object_id": self.id,
         }
         update_filter_dict(filter_kwargs, user, status)
         get_flag_model().objects.filter(**filter_kwargs).delete()
@@ -223,8 +235,8 @@ class ModelWithFlag(models.Model):
         :return:
         """
         filter_kwargs = {
-            'content_type': ContentType.objects.get_for_model(self),
-            'object_id': self.id,
+            "content_type": ContentType.objects.get_for_model(self),
+            "object_id": self.id,
         }
         update_filter_dict(filter_kwargs, user, status)
         return self.flags.filter(**filter_kwargs).count()
@@ -241,6 +253,7 @@ def update_filter_dict(d, user, status):
     if user is not None:
         if not user.id:
             return None
-        d['user'] = user
+        d["user"] = user
     if status is not None:
-        d['status'] = status
+        d["status"] = status
+
